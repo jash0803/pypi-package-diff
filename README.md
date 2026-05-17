@@ -4,17 +4,20 @@ Compare what was **actually shipped** to PyPI — not what's in the source repos
 
 A build step, a forgotten `.gitignore` entry, or a last-minute change can mean the published package looks nothing like the tagged commit. This tool downloads both versions directly from PyPI and diffs them file-by-file, so you always see the real artifact.
 
-![PyPI Package Diff screenshot](https://placehold.co/900x500/0d1117/58a6ff?text=PyPI+Package+Diff)
+![PyPI Package Diff screenshot](/public/images/dashboard.png)
 
 ## Features
 
-- **File-by-file diff** — unified diff view with line numbers, add/remove highlighting, and hunk context, just like a pull request review
-- **Change navigator** — left sidebar groups files into Added / Removed / Modified with per-file `+N −N` stats
-- **Summary bar** — instant overview of how many files changed and what artifact type was compared (wheel vs sdist)
-- **Shareable URLs** — every comparison is encoded in the URL (`?pkg=requests&v1=2.28.0&v2=2.29.0`), so you can bookmark or send a link
+- **Breaking changes** — detects removed public functions, classes, and methods; signature changes (added/removed parameters shown inline with green/red highlighting); return type changes
+- **What's New** — surfaces new public API additions across all modules; powered by **griffe** with full type annotation support
+- **CVE scanning** — queries the [OSV advisory database](https://osv.dev) (same source as `pip-audit`) for both versions; shows vulnerabilities fixed, introduced, and persisting
+- **Metadata diff** — dependency changes, `requires_python`, license, and classifier diffs powered by **pkginfo**
+- **File-by-file diff** — unified diff view with line numbers, add/remove highlighting, and hunk context
+- **Change navigator** — sidebar groups files into Added / Removed / Modified with per-file `+N −N` stats
+- **Summary bar** — instant overview of files changed and artifact type (wheel vs sdist)
+- **Shareable URLs** — every comparison is encoded in the URL (`?pkg=requests&v1=2.28.0&v2=2.29.0`)
 - **Download cache** — packages are cached at `~/.cache/pypi-diff/` so repeat comparisons are instant
-- **Binary detection** — binary files are flagged without attempting a text diff
-- **Dark / light mode** — toggle in the top-right corner; preference is saved in `localStorage` and defaults to the OS setting
+- **Dark / light mode** — preference saved in `localStorage`, defaults to the OS setting
 
 ## Tech stack
 
@@ -22,7 +25,10 @@ A build step, a forgotten `.gitignore` entry, or a last-minute change can mean t
 |---|---|
 | Backend | Python · FastAPI · uvicorn |
 | Package data | PyPI JSON API · `httpx` |
-| Diffing | Python `difflib` (unified diff) |
+| API analysis | `griffe` (type-aware AST extraction) |
+| Security | OSV REST API (same database as `pip-audit`) |
+| Metadata | `pkginfo` |
+| File diffing | Python `difflib` (unified diff) |
 | Frontend | React 18 · TypeScript · Vite |
 | Styling | Plain CSS with CSS custom properties |
 
@@ -75,28 +81,7 @@ Returns the list of published versions for a package, oldest-first.
 ```
 GET /api/packages/{package}/diff/{v1}/{v2}
 ```
-Downloads both versions (cached), extracts them, and returns a structured diff.
-
-**Response shape:**
-```jsonc
-{
-  "package": "requests",
-  "v1": "2.28.0",
-  "v2": "2.29.0",
-  "artifact_v1": "wheel",
-  "artifact_v2": "wheel",
-  "summary": { "added": 1, "removed": 0, "modified": 8, "total": 9 },
-  "files": [
-    {
-      "path": "requests/utils.py",
-      "status": "modified",       // "added" | "removed" | "modified"
-      "is_binary": false,
-      "diff": "--- a/requests/utils.py\n+++ ...",
-      "stats": { "added_lines": 12, "removed_lines": 4 }
-    }
-  ]
-}
-```
+Downloads both versions (cached), extracts them, and returns a structured diff including file changes, API changelog, security advisories, and metadata diffs.
 
 ## Artifact preference
 
@@ -107,29 +92,6 @@ For each version the backend prefers:
 
 The artifact type used for each version is returned in the response and shown in the UI summary bar.
 
-## Deploying to production
-
-See the [Hosting guide](#) for a full walkthrough using nginx + systemd on a VPS, or a single-container deploy on Railway/Render.
-
-**Quick Dockerfile:**
-```dockerfile
-FROM node:20-alpine AS frontend-build
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
-COPY frontend/ .
-RUN npm run build
-
-FROM python:3.11-slim
-WORKDIR /app/backend
-COPY backend/requirements.txt .
-RUN pip install -r requirements.txt
-COPY backend/ .
-COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
 ## Project structure
 
 ```
@@ -138,6 +100,9 @@ py-package-diff/
 │   ├── main.py          # FastAPI app, API endpoints
 │   ├── pypi_client.py   # PyPI download + extraction
 │   ├── differ.py        # File comparison + diff generation
+│   ├── analyzer.py      # Python API analysis via griffe
+│   ├── security.py      # CVE lookup via OSV API
+│   ├── meta_diff.py     # Package metadata diff via pkginfo
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -146,10 +111,13 @@ py-package-diff/
 │   │   ├── types.ts                    # Shared TypeScript types
 │   │   └── components/
 │   │       ├── SearchForm.tsx          # Package + version input
-│   │       ├── DiffView.tsx            # Result layout (summary + sidebar + panel)
+│   │       ├── DiffView.tsx            # Tabbed result layout
 │   │       ├── SummaryBar.tsx          # Stats strip
 │   │       ├── FileSidebar.tsx         # Changed files list
-│   │       └── DiffPanel.tsx           # Unified diff renderer
+│   │       ├── DiffPanel.tsx           # Unified diff renderer
+│   │       ├── Changelog.tsx           # API changelog (breaking + new)
+│   │       ├── Security.tsx            # CVE vulnerability view
+│   │       └── MetaDiff.tsx            # Package metadata diff
 │   └── vite.config.ts
 └── start.sh             # One-command local dev startup
 ```
@@ -164,6 +132,10 @@ Source repositories are not always an accurate representation of what gets publi
 - **Automation scripts** may modify files as part of the release pipeline
 
 PyPI Package Diff treats the published artifact as the single source of truth.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
