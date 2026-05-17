@@ -212,3 +212,6 @@ frontend/dist/
 
 # Backend venv
 backend/.venv/
+
+# macOS
+.DS_Store
