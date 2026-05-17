@@ -123,10 +123,13 @@ export default function App() {
             <SearchForm onCompare={compare} />
           </div>
 
-          <div style={{ display: "flex", gap: "32px", color: "var(--text-muted)", fontSize: "13px" }}>
+          <div style={{ display: "flex", gap: "24px", color: "var(--text-muted)", fontSize: "13px", flexWrap: "wrap", justifyContent: "center" }}>
+            <span>⚠ Breaking changes</span>
+            <span>✦ What's new</span>
+            <span>🛡 CVE scanning</span>
+            <span>📦 Metadata diff</span>
             <span>🔍 File-by-file diff</span>
             <span>🔗 Shareable URLs</span>
-            <span>🛡 Security auditing</span>
           </div>
         </main>
       )}
