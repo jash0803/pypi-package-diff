@@ -22,8 +22,8 @@ Thanks for your interest in contributing! This document covers everything you ne
 ### 1. Clone and start
 
 ```bash
-git clone https://github.com/you/py-package-diff
-cd py-package-diff
+git clone https://github.com/you/pypi-package-diff
+cd pypi-package-diff
 ./start.sh
 ```
 

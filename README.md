@@ -1,23 +1,50 @@
-# PyPI Package Diff
+# PyPI Diff — is it safe to upgrade?
 
-Compare what was **actually shipped** to PyPI — not what's in the source repository.
+A Dependabot PR bumps `litellm 1.84.0 → 1.85.0`. The changelog is missing, vague, or a wall of merged-PR titles. Do you rubber-stamp it, or spend twenty minutes spelunking through GitHub compare views?
 
-A build step, a forgotten `.gitignore` entry, or a last-minute change can mean the published package looks nothing like the tagged commit. This tool downloads both versions directly from PyPI and diffs them file-by-file, so you always see the real artifact.
+**PyPI Diff answers the question in one screen:** exactly which public functions, classes, and methods were removed or changed signature, what's new, which CVEs the bump fixes or introduces, and how the dependency tree moved.
+
+And it answers it from the **real artifacts published to PyPI** — not the source repo. Build steps, `.gitignore` entries, and last-minute edits mean the published package can differ from the tagged commit (ask anyone who audited the `xz` or `ultralytics` incidents). PyPI Diff downloads both versions and diffs what you'd actually install.
 
 ![PyPI Package Diff screenshot](/public/images/dashboard.png)
 
-## Features
+## What you get
 
-- **Breaking changes** — detects removed public functions, classes, and methods; signature changes (added/removed parameters shown inline with green/red highlighting); return type changes
-- **What's New** — surfaces new public API additions across all modules; powered by **griffe** with full type annotation support
+- **Breaking changes** — removed public functions, classes, and methods; signature changes with added/removed parameters highlighted inline; return type changes. Powered by **griffe** with full type annotation support.
+- **What's New** — every new public API across all modules, so you know what the upgrade buys you
 - **CVE scanning** — queries the [OSV advisory database](https://osv.dev) (same source as `pip-audit`) for both versions; shows vulnerabilities fixed, introduced, and persisting
 - **Metadata diff** — dependency changes, `requires_python`, license, and classifier diffs powered by **pkginfo**
-- **File-by-file diff** — unified diff view with line numbers, add/remove highlighting, and hunk context
-- **Change navigator** — sidebar groups files into Added / Removed / Modified with per-file `+N −N` stats
-- **Summary bar** — instant overview of files changed and artifact type (wheel vs sdist)
-- **Shareable URLs** — every comparison is encoded in the URL (`?pkg=requests&v1=2.28.0&v2=2.29.0`)
-- **Download cache** — packages are cached at `~/.cache/pypi-diff/` so repeat comparisons are instant
-- **Dark / light mode** — preference saved in `localStorage`, defaults to the OS setting
+- **File-by-file diff** — unified diff view with line numbers, add/remove highlighting, and a change navigator grouping files into Added / Removed / Modified
+- **Shareable URLs** — every comparison is a link you can drop in a PR review (`?pkg=requests&v1=2.28.0&v2=2.29.0`)
+- **CLI with CI mode** — the same report in your terminal; `--check` exits non-zero on breaking changes or newly introduced CVEs
+- **Fast repeats** — downloads are cached at `~/.cache/pypi-diff/`, and the UI has dark/light mode
+
+## CLI
+
+```bash
+pipx install ./backend      # or: pip install ./backend
+
+pypi-diff requests 2.31.0 2.32.0     # full upgrade report in the terminal
+pypi-diff litellm                    # compares the two latest versions
+pypi-diff litellm 1.84.0             # compares 1.84.0 against the latest
+pypi-diff numpy --json               # full structured diff as JSON
+pypi-diff litellm 1.84.0 1.85.0 --check   # CI gate: exit 1 on breaking changes / new CVEs
+```
+
+```
+requests 2.31.0 → 2.32.0 (wheel vs wheel)
+13 files changed: +0 added, -0 removed, ~13 modified
+
+Breaking changes none detected
+
+Security (OSV)
+  GHSA-9wx4-h78v-vm56 [MEDIUM] fixed by upgrading https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56
+  ...
+
+requires-python  >=3.7 → >=3.8
+```
+
+Flags: `--json` (structured output), `--files` (list every changed file), `--check` (CI exit code), `--no-color`.
 
 ## Tech stack
 
@@ -42,8 +69,8 @@ A build step, a forgotten `.gitignore` entry, or a last-minute change can mean t
 ### Run locally
 
 ```bash
-git clone https://github.com/you/py-package-diff
-cd py-package-diff
+git clone https://github.com/you/pypi-package-diff
+cd pypi-package-diff
 ./start.sh
 ```
 
@@ -70,6 +97,15 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Run with Docker
+
+```bash
+docker build -t py-package-diff .
+docker run -p 8000:8000 py-package-diff
+```
+
+The image builds the frontend, copies the static bundle into the Python image, and serves both the API and the built UI from FastAPI on http://localhost:8000. Any non-`/api` path falls back to `index.html` (SPA routing).
 
 ## API
 
@@ -98,6 +134,8 @@ The artifact type used for each version is returned in the response and shown in
 py-package-diff/
 ├── backend/
 │   ├── main.py          # FastAPI app, API endpoints
+│   ├── cli.py           # pypi-diff terminal command
+│   ├── pyproject.toml   # pip/pipx-installable CLI packaging
 │   ├── pypi_client.py   # PyPI download + extraction
 │   ├── differ.py        # File comparison + diff generation
 │   ├── analyzer.py      # Python API analysis via griffe
@@ -106,19 +144,22 @@ py-package-diff/
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── App.tsx                     # Root — routing, theme, URL state
-│   │   ├── api.ts                      # Typed fetch wrappers
-│   │   ├── types.ts                    # Shared TypeScript types
+│   │   ├── main.tsx                     # React entry point
+│   │   ├── App.tsx                      # Root — routing, theme, URL state
+│   │   ├── App.css                      # All styles (CSS custom properties)
+│   │   ├── api.ts                       # Typed fetch wrappers
+│   │   ├── types.ts                     # Shared TypeScript types
 │   │   └── components/
-│   │       ├── SearchForm.tsx          # Package + version input
-│   │       ├── DiffView.tsx            # Tabbed result layout
-│   │       ├── SummaryBar.tsx          # Stats strip
-│   │       ├── FileSidebar.tsx         # Changed files list
-│   │       ├── DiffPanel.tsx           # Unified diff renderer
-│   │       ├── Changelog.tsx           # API changelog (breaking + new)
-│   │       ├── Security.tsx            # CVE vulnerability view
-│   │       └── MetaDiff.tsx            # Package metadata diff
+│   │       ├── SearchForm.tsx           # Package + version input
+│   │       ├── DiffView.tsx             # Tabbed result layout
+│   │       ├── SummaryBar.tsx           # Stats strip
+│   │       ├── FileSidebar.tsx          # Changed files list
+│   │       ├── DiffPanel.tsx            # Unified diff renderer
+│   │       ├── Changelog.tsx            # API changelog (breaking + new)
+│   │       ├── Security.tsx             # CVE vulnerability view
+│   │       └── MetaDiff.tsx             # Package metadata diff
 │   └── vite.config.ts
+├── Dockerfile           # Multi-stage build (frontend → FastAPI static serving)
 └── start.sh             # One-command local dev startup
 ```
 
@@ -139,4 +180,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT
+Released under the [MIT License](LICENSE).
