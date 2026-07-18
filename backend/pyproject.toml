@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypi-diff"
+version = "0.1.0"
+description = "Diff two published PyPI versions: breaking API changes, new APIs, CVEs, dependencies, and file changes — from the real uploaded artifacts."
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.25.0",
+    "packaging>=23.0",
+    "griffe>=0.40.0",
+    "pkginfo>=1.10.0",
+]
+
+[project.scripts]
+pypi-diff = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli", "analyzer", "differ", "meta_diff", "pypi_client", "security"]
