@@ -111,11 +111,12 @@ export default function App() {
         <main className="hero">
           <div>
             <h1 className="hero-title">
-              Compare <span>PyPI</span> packages
+              Is it safe to <span>upgrade</span>?
             </h1>
             <p className="hero-subtitle" style={{ marginTop: "12px" }}>
-              Inspect what was actually shipped — not what's in the repo.
-              Audit changes between any two published versions.
+              See exactly what a version bump will do to you — breaking API
+              changes, new APIs, CVEs, and dependency changes. Diffed from the
+              real artifacts published to PyPI, not the repo.
             </p>
           </div>
 
